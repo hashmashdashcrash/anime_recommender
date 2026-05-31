@@ -1,0 +1,25 @@
+{% extends 'anime/base.html' %}
+
+{% block content %}
+
+<h1>Anime Watchlist and Recommendation System</h1>
+
+<form method="get">
+    <input type="text" name="search" placeholder="Search anime..." value="{{ search }}">
+    <input type="text" name="genre" placeholder="Filter by genre..." value="{{ genre }}">
+    <button type="submit">Search</button>
+</form>
+
+{% for anime in anime_list %}
+    <div class="card">
+        <h2>{{ anime.title }}</h2>
+        <p><strong>Genres:</strong> {{ anime.genres }}</p>
+        <p><strong>Rating:</strong> {{ anime.rating }}</p>
+        <p><strong>Episodes:</strong> {{ anime.episodes }}</p>
+        <a class="button" href="{% url 'anime_detail' anime.id %}">View Details</a>
+    </div>
+{% empty %}
+    <p>No anime found.</p>
+{% endfor %}
+
+{% endblock %}

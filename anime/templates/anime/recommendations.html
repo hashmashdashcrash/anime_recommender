@@ -1,0 +1,33 @@
+{% extends 'anime/base.html' %}
+
+{% block content %}
+
+<h1>Recommendations</h1>
+
+<p>{{ reason }}</p>
+
+{% if has_watchlist %}
+    {% for anime, score, shared_genres in recommended %}
+        <div class="card">
+            <h2>{{ anime.title }}</h2>
+            <p><strong>Genres:</strong> {{ anime.genres }}</p>
+            <p><strong>Rating:</strong> {{ anime.rating }}</p>
+            <p><strong>Shared genres:</strong> {{ shared_genres }}</p>
+            <p><strong>Recommendation score:</strong> {{ score|floatformat:2 }}</p>
+            <a class="button" href="{% url 'anime_detail' anime.id %}">View Details</a>
+        </div>
+    {% empty %}
+        <p>No recommendations found yet.</p>
+    {% endfor %}
+{% else %}
+    {% for anime in recommended %}
+        <div class="card">
+            <h2>{{ anime.title }}</h2>
+            <p><strong>Genres:</strong> {{ anime.genres }}</p>
+            <p><strong>Rating:</strong> {{ anime.rating }}</p>
+            <a class="button" href="{% url 'anime_detail' anime.id %}">View Details</a>
+        </div>
+    {% endfor %}
+{% endif %}
+
+{% endblock %}
