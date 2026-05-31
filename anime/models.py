@@ -23,3 +23,16 @@ class WatchlistItem(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.anime.title}"
+
+
+class AnimeRating(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    anime = models.ForeignKey(Anime, on_delete=models.CASCADE)
+    score = models.IntegerField(default=3)
+    rated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'anime')
+
+    def __str__(self):
+        return f"{self.user.username} rated {self.anime.title}: {self.score}/5"

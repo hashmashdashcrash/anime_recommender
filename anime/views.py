@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth import login as auth_login, logout as auth_logout
-from .models import Anime, WatchlistItem
+from .models import Anime, WatchlistItem, AnimeRating
 
 
 def register_view(request):
@@ -60,14 +60,42 @@ def anime_list(request):
 def anime_detail(request, anime_id):
     anime = get_object_or_404(Anime, id=anime_id)
     in_watchlist = False
+    user_rating = None
 
     if request.user.is_authenticated:
         in_watchlist = WatchlistItem.objects.filter(user=request.user, anime=anime).exists()
+        user_rating = AnimeRating.objects.filter(user=request.user, anime=anime).first()
 
     return render(request, 'anime/anime_detail.html', {
         'anime': anime,
-        'in_watchlist': in_watchlist
+        'in_watchlist': in_watchlist,
+        'user_rating': user_rating
     })
+
+
+@login_required
+def rate_anime(request, anime_id):
+    anime = get_object_or_404(Anime, id=anime_id)
+
+    if request.method == 'POST':
+        score = int(request.POST.get('score', 3))
+
+        if score < 1:
+            score = 1
+        elif score > 5:
+            score = 5
+
+        rating, created = AnimeRating.objects.get_or_create(
+            user=request.user,
+            anime=anime,
+            defaults={'score': score}
+        )
+
+        if not created:
+            rating.score = score
+            rating.save()
+
+    return redirect('anime_detail', anime_id=anime.id)
 
 
 @login_required
@@ -100,29 +128,47 @@ def recommendations(request):
     if not watched_anime:
         recommended = Anime.objects.all().order_by('-rating')[:10]
         reason = "These recommendations are based on the highest rated anime because your watchlist is currently empty."
-    else:
-        user_genres = set()
 
-        for anime in watched_anime:
-            for genre in anime.genres.split(','):
-                user_genres.add(genre.strip().lower())
+        return render(request, 'anime/recommendations.html', {
+            'recommended': recommended,
+            'reason': reason,
+            'has_watchlist': False
+        })
 
-        scores = []
+    genre_scores = {}
 
-        for anime in Anime.objects.exclude(id__in=[a.id for a in watched_anime]):
-            anime_genres = set(g.strip().lower() for g in anime.genres.split(','))
-            shared_genres = user_genres.intersection(anime_genres)
+    for anime in watched_anime:
+        user_rating = AnimeRating.objects.filter(user=request.user, anime=anime).first()
 
-            if shared_genres:
-                score = len(shared_genres) + (anime.rating / 10)
-                scores.append((anime, score, ', '.join(shared_genres)))
+        if user_rating:
+            weight = user_rating.score
+        else:
+            weight = 3
 
-        scores.sort(key=lambda x: x[1], reverse=True)
-        recommended = scores[:10]
-        reason = "These recommendations are based on anime that share genres with your watchlist."
+        for genre in anime.genres.split(','):
+            genre = genre.strip().lower()
+
+            if genre:
+                genre_scores[genre] = genre_scores.get(genre, 0) + weight
+
+    scores = []
+
+    for anime in Anime.objects.exclude(id__in=[a.id for a in watched_anime]):
+        anime_genres = set(g.strip().lower() for g in anime.genres.split(','))
+        shared_genres = anime_genres.intersection(genre_scores.keys())
+
+        if shared_genres:
+            genre_score = sum(genre_scores[genre] for genre in shared_genres)
+            final_score = genre_score + (anime.rating / 10)
+            scores.append((anime, final_score, ', '.join(shared_genres)))
+
+    scores.sort(key=lambda x: x[1], reverse=True)
+    recommended = scores[:10]
+
+    reason = "These recommendations are based on your watchlist, your personal ratings, shared genres, and the anime's general rating."
 
     return render(request, 'anime/recommendations.html', {
         'recommended': recommended,
         'reason': reason,
-        'has_watchlist': bool(watched_anime)
+        'has_watchlist': True
     })
